@@ -105,9 +105,11 @@ class MyProtocolSever(asyncio.Protocol):
 
 
 class MyProtocolClient(asyncio.Protocol):
-	def __init__(self):
+	def __init__(self,loop):
 		self.recvnum = 0
 		self.deserializer = PacketType.Deserializer()
+		self.transport = None
+		self.loop = loop
 	
 	def connection_made(self, transport):
 		print('Connection made')
@@ -131,9 +133,16 @@ class MyProtocolClient(asyncio.Protocol):
 				packetBytes5 = final.__serialize__()	
 				self.transport.write(packetBytes5)
 				self.transport.close()
+	def sendFirstPacket(self):
+		request=RequestPacket()
+		request.Request = "true"
+		packetBytes1 = request.__serialize__()
+		self.transport.write(packetBytes1)
+
 	def connection_lost(self,exc):
 		self.transport = None
 		print('Connection Complete!')
+		self.loop.stop()
 
 class RequestConnection:
 	def __init__(self,transp):
@@ -150,7 +159,7 @@ class RequestConnection:
 if __name__=="__main__":
 	mode = sys.argv[1]
 	loop = asyncio.get_event_loop()
-	loop.set_debug(enabled=True)
+	#loop.set_debug(enabled=True)
 	if mode.lower() == "server":
        		coro = playground.getConnector().create_playground_server(lambda: MyProtocolSever(), 101)
         	server = loop.run_until_complete(coro)
@@ -162,12 +171,10 @@ if __name__=="__main__":
 	else:
 		remoteAddress = mode
 		#control = MyControl()
-		coro = playground.getConnector().create_playground_connection(MyProtocolClient, remoteAddress, 101)
+		coro = playground.getConnector().create_playground_connection(lambda: MyProtocolClient(loop), remoteAddress, 101)
 		transport, protocol = loop.run_until_complete(coro)
-		RequestConnection(transport)
-		#print("Client Connected. Starting UI t:{}. p:{}".format(transport, protocol))
+		#RequestConnection(transport)
+		protocol.sendFirstPacket()
 		#loop.add_reader(sys.stdin, control.stdinAlert)
-		#control.connect(protocol)
-		#control.Alert()
-		#loop.run_forever()
+		loop.run_forever()
 		loop.close()
