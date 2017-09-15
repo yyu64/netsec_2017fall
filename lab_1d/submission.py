@@ -73,7 +73,7 @@ class MyProtocolSever(asyncio.Protocol):
 		print('Sever Received Packet')
 		print(self.recvnum)
 		for pkt in self.deserializer.nextPackets():
-			print(pkt.Request)
+			#print(pkt.Request)
 			#if not pkt.OriginalS:
 			if(isinstance(pkt,RequestPacket)):
 				print('Packet type:RequestPacket')
@@ -110,19 +110,14 @@ class MyProtocolClient(asyncio.Protocol):
 		self.deserializer = PacketType.Deserializer()
 	
 	def connection_made(self, transport):
-		
-		request=RequestPacket()
-		request.Request = "true"
-		packetBytes1 = request.__serialize__()
-		transport.write(packetBytes1)
 		print('Connection made')
 		self.transport = transport
 
 	def data_received(self, data):
 		self.deserializer.update(data)
 		self.recvnum = self.recvnum + 1
-		print('Client Received Packet!')
-		print(self.recvnum)
+		#print('Client Received Packet!')
+		#print(self.recvnum)
 		for pkt in self.deserializer.nextPackets():
 			if(isinstance(pkt,QTimeZonePacket)):
 				atimezone=ATimeZonePacket()
@@ -130,39 +125,27 @@ class MyProtocolClient(asyncio.Protocol):
 				packetBytes3 = atimezone.__serialize__()
 				self.transport.write(packetBytes3)
 			elif(isinstance(pkt,DatePacket)):
+				#print("Final Packet")
 				final=FinalPacket()
 				final.thx = b"Thanks!"
 				packetBytes5 = final.__serialize__()	
 				self.transport.write(packetBytes5)
 				self.transport.close()
+	def connection_lost(self,exc):
+		self.transport = None
+		print('Connection Complete!')
+
+class RequestConnection:
+	def __init__(self,transp):
+		self.transp = transp
+		self.sendFirstPacket()
+
 	def sendFirstPacket(self):
 		request=RequestPacket()
 		request.Request = "true"
 		packetBytes1 = request.__serialize__()
-		self.transport.write(packetBytes1)
-		print('This first packet!')
-class MyControl:
-    def __init__(self):
-        self.txProtocol = None
-        
-    def buildProtocol(self):
-        return MyProtocolClient()
-        
-    def connect(self, txProtocol):
-        self.txProtocol = txProtocol
-        print("Echo Connection to Server Established!")
-        self.txProtocol = txProtocol
-        #print("Enter Message: ", end="")
-        
-    def callback(self, message):
-        print("Server Response: {}".format(message))
-        
-    def Alert(self):
-        #data = sys.stdin.readline()
-        #if data and data[-1] == "\n":
-            #data = data[:-1] # strip off \n
-        self.txProtocol.sendFirstPacket()
-		
+		self.transp.write(packetBytes1)
+				
 
 if __name__=="__main__":
 	mode = sys.argv[1]
@@ -181,10 +164,10 @@ if __name__=="__main__":
 		#control = MyControl()
 		coro = playground.getConnector().create_playground_connection(MyProtocolClient, remoteAddress, 101)
 		transport, protocol = loop.run_until_complete(coro)
-		#protocol.sendFirstPacket()
-		print("Client Connected. Starting UI t:{}. p:{}".format(transport, protocol))
+		RequestConnection(transport)
+		#print("Client Connected. Starting UI t:{}. p:{}".format(transport, protocol))
 		#loop.add_reader(sys.stdin, control.stdinAlert)
 		#control.connect(protocol)
 		#control.Alert()
-		loop.run_forever()
+		#loop.run_forever()
 		loop.close()
